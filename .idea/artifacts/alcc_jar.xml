@@ -1,0 +1,11 @@
+<component name="ArtifactManager">
+  <artifact name="alcc:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/alcc_jar</output-path>
+    <root id="root">
+      <element id="archive" name="alcc.jar">
+        <element id="module-output" name="alcclassifier" />
+      </element>
+      <element id="library" level="project" name="nz.ac.waikato.cms.moa:moa:2017.06" />
+    </root>
+  </artifact>
+</component>
