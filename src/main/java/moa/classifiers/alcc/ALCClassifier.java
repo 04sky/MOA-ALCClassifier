@@ -83,9 +83,9 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
                     clustering = macroClustering;
                 }
             }
-            HashMap<Integer, ArrayList<Instance>> pointsFittingToClusters = new HashMap<>();
+            ArrayList<ArrayList<Instance>> pointsFittingToClusters = new ArrayList<>();
             for(int i = 0; i < clustering.size(); ++i) {
-                pointsFittingToClusters.put(i, new ArrayList<>());
+                pointsFittingToClusters.add(new ArrayList<>());
             }
             for(Instance sample: chunk) {
                 Instance sampleWithoutClass = sample.copy();
@@ -99,7 +99,7 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
             }
             // samples have been fitted, so now for every cluster, we are training classifier number of samples,
             // according to budget
-            for(ArrayList<Instance> samples: pointsFittingToClusters.values()) {
+            for(ArrayList<Instance> samples: pointsFittingToClusters) {
                 Collections.shuffle(samples);
                 for(int i = 0; i < this.budgetOption.getValue() * samples.size(); ++i) {
                     this.classifier.trainOnInstance(samples.get(i));
