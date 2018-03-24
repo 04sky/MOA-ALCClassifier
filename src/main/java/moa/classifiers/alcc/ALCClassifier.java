@@ -57,54 +57,69 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
         this.chunk = new ArrayList<>();
     }
 
+    private Instance stripClassFromInstance(Instance instance) {
+        Instance instanceWithoutClass = instance.copy();
+        instanceWithoutClass.deleteAttributeAt(instance.classIndex());
+        return instanceWithoutClass;
+    }
+
+    private Clustering extractClusteringsFromClusterer() {
+        Clustering macroClustering = this.clusterer.getClusteringResult();
+        Clustering microClustering;
+        Clustering clustering = null;
+        if(this.clusterer.implementsMicroClusterer()) {
+            microClustering = this.clusterer.getMicroClusteringResult();
+            if(macroClustering == null && microClustering != null) {
+                Clustering gtPoints = new Clustering(this.chunk);
+                macroClustering = moa.clusterers.KMeans.gaussianMeans(gtPoints, microClustering);
+            }
+            if(((AbstractClusterer)this.clusterer).evaluateMicroClusteringOption.isSet()) {
+                clustering = microClustering;
+            } else {
+                clustering = macroClustering;
+            }
+        }
+        return clustering;
+    }
+
+    private ArrayList<ArrayList<Instance>> fitPointsToClusterings(Clustering clustering) {
+        ArrayList<ArrayList<Instance>> pointsFittingToClusters = new ArrayList<>();
+        for(int i = 0; i < clustering.size(); ++i) {
+            pointsFittingToClusters.add(new ArrayList<>());
+        }
+        for(Instance sample: chunk) {
+            Instance sampleWithoutClass = stripClassFromInstance(sample);
+            for(int i = 0; i < clustering.size(); ++i) {
+                Cluster cluster = clustering.get(i);
+                if(cluster.getInclusionProbability(sampleWithoutClass) > 0.8) {
+                    pointsFittingToClusters.get(i).add(sample);
+                }
+            }
+        }
+        return pointsFittingToClusters;
+    }
+
+    private void trainFittedPointsWithRegardOfBudget(ArrayList<ArrayList<Instance>> pointsFittingToClusters) {
+        // samples have been fitted, so now for every cluster, we are training classifier number of samples,
+        // according to budget
+        for(ArrayList<Instance> samples: pointsFittingToClusters) {
+            Collections.shuffle(samples);
+            for(int i = 0; i < this.budgetOption.getValue() * samples.size(); ++i) {
+                this.classifier.trainOnInstance(samples.get(i));
+            }
+        }
+    }
+
     @Override
     public void trainOnInstanceImpl(Instance inst) {
         this.chunk.add(inst);
-        Instance instWithoutClass = inst.copy();
-        instWithoutClass.deleteAttributeAt(inst.classIndex());
+        Instance instWithoutClass = stripClassFromInstance(inst);
         this.clusterer.trainOnInstance(instWithoutClass);
 
         if(chunk.size() >= chunkSizeOption.getValue()) {
-            // now this gets tricky... we can extract clusterings, but not points which created them
-            // so we need to fit all samples from chunk to clusters
-            // micro / macro clustering based on code in moa.gui.visualization.RunVisualizer
-            Clustering macroClustering = this.clusterer.getClusteringResult();
-            Clustering microClustering;
-            Clustering clustering = null;
-            if(this.clusterer.implementsMicroClusterer()) {
-                microClustering = this.clusterer.getMicroClusteringResult();
-                if(macroClustering == null && microClustering != null) {
-                    Clustering gtPoints = new Clustering(this.chunk);
-                    macroClustering = moa.clusterers.KMeans.gaussianMeans(gtPoints, microClustering);
-                }
-                if(((AbstractClusterer)this.clusterer).evaluateMicroClusteringOption.isSet()) {
-                    clustering = microClustering;
-                } else {
-                    clustering = macroClustering;
-                }
-            }
-            ArrayList<ArrayList<Instance>> pointsFittingToClusters = new ArrayList<>();
-            for(int i = 0; i < clustering.size(); ++i) {
-                pointsFittingToClusters.add(new ArrayList<>());
-            }
-            for(Instance sample: chunk) {
-                Instance sampleWithoutClass = sample.copy();
-                sampleWithoutClass.deleteAttributeAt(sample.classIndex());
-                for(int i = 0; i < clustering.size(); ++i) {
-                    Cluster cluster = clustering.get(i);
-                    if(cluster.getInclusionProbability(sampleWithoutClass) > 0.8) {
-                        pointsFittingToClusters.get(i).add(sample);
-                    }
-                }
-            }
-            // samples have been fitted, so now for every cluster, we are training classifier number of samples,
-            // according to budget
-            for(ArrayList<Instance> samples: pointsFittingToClusters) {
-                Collections.shuffle(samples);
-                for(int i = 0; i < this.budgetOption.getValue() * samples.size(); ++i) {
-                    this.classifier.trainOnInstance(samples.get(i));
-                }
-            }
+            Clustering clustering = extractClusteringsFromClusterer();
+            ArrayList<ArrayList<Instance>> pointsFittingToClusters = fitPointsToClusterings(clustering);
+            trainFittedPointsWithRegardOfBudget(pointsFittingToClusters);
             chunk.clear();
         }
     }
