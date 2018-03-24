@@ -64,6 +64,9 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
     }
 
     private Clustering extractClusteringsFromClusterer() {
+        // now this gets tricky... we can extract clusterings, but not points which created them
+        // so we need to fit all samples from chunk to clusters
+        // micro / macro clustering based on code in moa.gui.visualization.RunVisualizer
         Clustering macroClustering = this.clusterer.getClusteringResult();
         Clustering microClustering;
         Clustering clustering = null;
