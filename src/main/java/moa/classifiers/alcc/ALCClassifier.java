@@ -145,7 +145,7 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
     @Override
     protected Measurement[] getModelMeasurementsImpl() {
         List<Measurement> measurementList = new LinkedList<>();
-        for(MOAObject object: new MOAObject[]{this.classifier}) {
+        for(MOAObject object: new MOAObject[]{this.classifier, this.clusterer}) {
             Measurement[] modelMeasurements = null;
             if(object instanceof Classifier) {
                 try {
