@@ -69,7 +69,7 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
             // so we need to fit all samples from chunk to clusters
             // micro / macro clustering based on code in moa.gui.visualization.RunVisualizer
             Clustering macroClustering = this.clusterer.getClusteringResult();
-            Clustering microClustering = null;
+            Clustering microClustering;
             Clustering clustering = null;
             if(this.clusterer.implementsMicroClusterer()) {
                 microClustering = this.clusterer.getMicroClusteringResult();
@@ -88,9 +88,11 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
                 pointsFittingToClusters.put(i, new ArrayList<>());
             }
             for(Instance sample: chunk) {
+                Instance sampleWithoutClass = sample.copy();
+                sampleWithoutClass.deleteAttributeAt(sample.classIndex());
                 for(int i = 0; i < clustering.size(); ++i) {
                     Cluster cluster = clustering.get(i);
-                    if(cluster.getInclusionProbability(sample) > 0.8) {
+                    if(cluster.getInclusionProbability(sampleWithoutClass) > 0.8) {
                         pointsFittingToClusters.get(i).add(sample);
                     }
                 }
@@ -137,9 +139,7 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
                 } catch(UnsupportedOperationException e) {}
             }
             if (modelMeasurements != null) {
-                for (Measurement measurement: modelMeasurements) {
-                    measurementList.add(measurement);
-                }
+                Collections.addAll(measurementList, modelMeasurements);
             }
         }
         return measurementList.toArray(new Measurement[measurementList.size()]);
