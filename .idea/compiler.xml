@@ -6,11 +6,11 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="alct" />
+        <module name="alcclassifier" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="alct" target="1.8" />
+      <module name="alcclassifier" target="1.8" />
       <module name="moa" target="1.5" />
     </bytecodeTargetLevel>
   </component>

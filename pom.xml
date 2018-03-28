@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.github.jagub2</groupId>
-    <artifactId>moa-alct</artifactId>
+    <artifactId>moa-alcc</artifactId>
     <version>1.0-SNAPSHOT</version>
     <build>
         <plugins>
@@ -19,6 +19,11 @@
             </plugin>
         </plugins>
     </build>
-
-
+    <dependencies>
+        <dependency>
+            <groupId>nz.ac.waikato.cms.moa</groupId>
+            <artifactId>moa</artifactId>
+            <version>2017.06</version>
+        </dependency>
+    </dependencies>
 </project>
