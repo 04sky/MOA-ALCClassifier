@@ -2,6 +2,7 @@ package moa.classifiers.alcc;
 
 import java.util.*;
 
+import com.github.javacliparser.FlagOption;
 import moa.MOAObject;
 import moa.classifiers.AbstractClassifier;
 import moa.classifiers.Classifier;
@@ -40,6 +41,9 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
     public IntOption chunkSizeOption = new IntOption("chunkSize",
             'c', "Number of instances creating one chunk.",
             1000, 0, Integer.MAX_VALUE);
+
+    public FlagOption checkPointsOutsideOfClusteringsOption = new FlagOption("checkPointsOutsideOfClusterings",
+            'p', "Check points outside of clusterings");
 
     public Classifier classifier;
 
@@ -81,22 +85,31 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
             } else {
                 clustering = macroClustering;
             }
+        } else {
+            clustering = macroClustering;
         }
+        // okay, if at this point clustering is still null, then something is wrong with used clusterer
         return clustering;
     }
 
     private ArrayList<ArrayList<Instance>> fitPointsToClusterings(Clustering clustering) {
         ArrayList<ArrayList<Instance>> pointsFittingToClusters = new ArrayList<>();
-        for(int i = 0; i < clustering.size(); ++i) {
+        for(int i = 0; i < clustering.size() + 1; ++i) {
             pointsFittingToClusters.add(new ArrayList<>());
         }
         for(Instance sample: chunk) {
             Instance sampleWithoutClass = stripClassFromInstance(sample);
-            for(int i = 0; i < clustering.size(); ++i) {
+            boolean sampleAdded = false;
+            for(int i = 0; i < clustering.size() - 1; ++i) {
                 Cluster cluster = clustering.get(i);
                 if(cluster.getInclusionProbability(sampleWithoutClass) > 0.8) {
                     pointsFittingToClusters.get(i).add(sample);
+                    sampleAdded = true;
+                    break;
                 }
+            }
+            if(!sampleAdded) {
+                pointsFittingToClusters.get(clustering.size() - 1).add(sample);
             }
         }
         return pointsFittingToClusters;
@@ -105,11 +118,17 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
     private void trainFittedPointsWithRegardOfBudget(ArrayList<ArrayList<Instance>> pointsFittingToClusters) {
         // samples have been fitted, so now for every cluster, we are training classifier number of samples,
         // according to budget
+        int clusteringIndex = 0;
         for(ArrayList<Instance> samples: pointsFittingToClusters) {
+            if(clusteringIndex == pointsFittingToClusters.size() - 1 &&
+                    !checkPointsOutsideOfClusteringsOption.isSet()) {
+                break;
+            }
             Collections.shuffle(samples);
             for(int i = 0; i < this.budgetOption.getValue() * samples.size(); ++i) {
                 this.classifier.trainOnInstance(samples.get(i));
             }
+            clusteringIndex++;
         }
     }
 
