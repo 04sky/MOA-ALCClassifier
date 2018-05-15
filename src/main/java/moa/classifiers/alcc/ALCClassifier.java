@@ -72,19 +72,17 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
         // so we need to fit all samples from chunk to clusters
         // micro / macro clustering based on code in moa.gui.visualization.RunVisualizer
         Clustering macroClustering = this.clusterer.getClusteringResult();
-        Clustering microClustering;
-        Clustering clustering = null;
+        Clustering microClustering = null;
+        Clustering clustering;
         if(this.clusterer.implementsMicroClusterer()) {
             microClustering = this.clusterer.getMicroClusteringResult();
             if(macroClustering == null && microClustering != null) {
                 Clustering gtPoints = new Clustering(this.chunk);
                 macroClustering = moa.clusterers.KMeans.gaussianMeans(gtPoints, microClustering);
             }
-            if(((AbstractClusterer)this.clusterer).evaluateMicroClusteringOption.isSet()) {
-                clustering = microClustering;
-            } else {
-                clustering = macroClustering;
-            }
+        }
+        if(((AbstractClusterer)this.clusterer).evaluateMicroClusteringOption.isSet() && microClustering != null) {
+            clustering = microClustering;
         } else {
             clustering = macroClustering;
         }
