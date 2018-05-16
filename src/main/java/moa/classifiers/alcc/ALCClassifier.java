@@ -71,20 +71,20 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
         // now this gets tricky... we can extract clusterings, but not points which created them
         // so we need to fit all samples from chunk to clusters
         // micro / macro clustering based on code in moa.gui.visualization.RunVisualizer
-        Clustering macroClustering = this.clusterer.getClusteringResult();
-        Clustering microClustering = null;
-        Clustering clustering;
-        if(this.clusterer.implementsMicroClusterer()) {
-            microClustering = this.clusterer.getMicroClusteringResult();
+        Clustering macroClustering = clusterer.getClusteringResult();
+        Clustering microClustering;
+        Clustering clustering = macroClustering;
+        if(clusterer.implementsMicroClusterer()) {
+            microClustering = clusterer.getMicroClusteringResult();
             if(macroClustering == null && microClustering != null) {
-                Clustering gtPoints = new Clustering(this.chunk);
+                Clustering gtPoints = new Clustering(chunk);
                 macroClustering = moa.clusterers.KMeans.gaussianMeans(gtPoints, microClustering);
             }
-        }
-        if(((AbstractClusterer)this.clusterer).evaluateMicroClusteringOption.isSet() && microClustering != null) {
-            clustering = microClustering;
-        } else {
-            clustering = macroClustering;
+            if(((AbstractClusterer)clusterer).evaluateMicroClusteringOption.isSet()) {
+                clustering = microClustering;
+            } else {
+                clustering = macroClustering;
+            }
         }
         // okay, if at this point clustering is still null, then something is wrong with used clusterer
         return clustering;
@@ -123,8 +123,8 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
                 break;
             }
             Collections.shuffle(samples);
-            for(int i = 0; i < this.budgetOption.getValue() * samples.size(); ++i) {
-                this.classifier.trainOnInstance(samples.get(i));
+            for(int i = 0; i < budgetOption.getValue() * samples.size(); ++i) {
+                classifier.trainOnInstance(samples.get(i));
             }
             clusteringIndex++;
         }
@@ -132,9 +132,9 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
 
     @Override
     public void trainOnInstanceImpl(Instance inst) {
-        this.chunk.add(inst);
+        chunk.add(inst);
         Instance instWithoutClass = stripClassFromInstance(inst);
-        this.clusterer.trainOnInstance(instWithoutClass);
+        clusterer.trainOnInstance(instWithoutClass);
 
         if(chunk.size() >= chunkSizeOption.getValue()) {
             Clustering clustering = extractClusteringsFromClusterer();
@@ -146,7 +146,7 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
 
     @Override
     public double[] getVotesForInstance(Instance inst) {
-        return this.classifier.getVotesForInstance(inst);
+        return classifier.getVotesForInstance(inst);
     }
 
     @Override
@@ -156,13 +156,13 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
 
     @Override
     public void getModelDescription(StringBuilder out, int indent) {
-        ((AbstractClassifier) this.classifier).getModelDescription(out, indent);
+        ((AbstractClassifier)classifier).getModelDescription(out, indent);
     }
 
     @Override
     protected Measurement[] getModelMeasurementsImpl() {
         List<Measurement> measurementList = new LinkedList<>();
-        for(MOAObject object: new MOAObject[]{this.classifier, this.clusterer}) {
+        for(MOAObject object: new MOAObject[]{classifier, clusterer}) {
             Measurement[] modelMeasurements = null;
             if(object instanceof Classifier) {
                 try {
