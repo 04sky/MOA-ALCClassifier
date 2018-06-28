@@ -2,7 +2,7 @@ package moa.classifiers.alcc;
 
 import java.util.*;
 
-import com.github.javacliparser.FlagOption;
+//import javafx.util.Pair;
 import moa.MOAObject;
 import moa.classifiers.AbstractClassifier;
 import moa.classifiers.Classifier;
@@ -16,10 +16,29 @@ import moa.clusterers.Clusterer;
 
 import moa.core.Measurement;
 import moa.options.ClassOption;
+import com.github.javacliparser.FlagOption;
 import com.github.javacliparser.FloatOption;
 import com.github.javacliparser.IntOption;
 
 public class ALCClassifier extends AbstractClassifier implements MultiClassClassifier {
+
+    private class Pair<T1, T2> {
+        private T1 first;
+        private T2 last;
+
+        Pair(T1 first, T2 last) {
+            this.first = first;
+            this.last = last;
+        }
+
+        public T1 getFirst() {
+            return first;
+        }
+
+        public T2 getLast() {
+            return last;
+        }
+    }
 
     private static final long serialVersionUID = 1L;
 
@@ -44,6 +63,10 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
 
     public FlagOption checkPointsOutsideOfClusteringsOption = new FlagOption("checkPointsOutsideOfClusterings",
             'p', "Check points outside of clusterings");
+
+    public FlagOption computeDistancesBetweenPointsInClusterOption = new FlagOption(
+            "computeDistancesBetweenPointsInCluster", 'd',
+            "Compute distances between points in cluster");
 
     public Classifier classifier;
 
@@ -90,7 +113,7 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
         return clustering;
     }
 
-    private ArrayList<ArrayList<Instance>> fitPointsToClusterings(Clustering clustering) {
+    private Pair<ArrayList<ArrayList<Instance>>, ArrayList<Double>> fitPointsToClusterings(Clustering clustering) {
         ArrayList<ArrayList<Instance>> pointsFittingToClusters = new ArrayList<>();
         for(int i = 0; i < clustering.size() + 1; ++i) {
             pointsFittingToClusters.add(new ArrayList<>());
@@ -110,21 +133,73 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
                 pointsFittingToClusters.get(clustering.size() - 1).add(sample);
             }
         }
-        return pointsFittingToClusters;
+        ArrayList<Double> distances;
+        if(computeDistancesBetweenPointsInClusterOption.isSet()) {
+            distances = computeDistances(pointsFittingToClusters);
+            distances = normalizeDistances(distances);
+            distances.add(1.0); // points outside of clustering
+        } else {
+            distances = equalDistances(pointsFittingToClusters.size());
+        }
+        return new Pair<>(pointsFittingToClusters, distances);
     }
 
-    private void trainFittedPointsWithRegardOfBudget(ArrayList<ArrayList<Instance>> pointsFittingToClusters) {
+    private ArrayList<Double> computeDistances(ArrayList<ArrayList<Instance>> pointsFittingToClusters) {
+        ArrayList<Double> distances = new ArrayList<>();
+        // we don't care for last "cluster" - they're points outside of any clustering
+        for(int k = 0; k < pointsFittingToClusters.size() - 1; ++k) {
+            int connections = 0;
+            double distance = 0;
+            for(int i = 0; i < pointsFittingToClusters.get(k).size() - 1; ++i) {
+                for(int j = i + 1; j < pointsFittingToClusters.get(k).size(); ++j) {
+                    // distance between (i, j)
+                    Instance instanceI = stripClassFromInstance(pointsFittingToClusters.get(k).get(i));
+                    Instance instanceJ = stripClassFromInstance(pointsFittingToClusters.get(k).get(j));
+                    double ijDistance = 0;
+                    for(int m = 0; m < instanceI.numAttributes(); ++m) {
+                        ijDistance += Math.pow(instanceI.value(m) - instanceJ.value(m), 2);
+                    }
+                    ijDistance = Math.sqrt(ijDistance);
+                    distance += ijDistance;
+                    connections++;
+                }
+            }
+            distance /= connections;
+            distances.add(distance);
+        }
+        return distances;
+    }
+
+    private ArrayList<Double> normalizeDistances(ArrayList<Double> distances) {
+        ArrayList<Double> normalizedDistances = new ArrayList<>(distances);
+        double maxDistance = Collections.max(distances);
+        for(int i = 0; i < normalizedDistances.size(); ++i) {
+            normalizedDistances.set(i, normalizedDistances.get(i) / maxDistance);
+        }
+        return normalizedDistances;
+    }
+
+    private ArrayList<Double> equalDistances(int n) {
+        return new ArrayList<>(Collections.nCopies(n, 1.0));
+    }
+
+    private void trainFittedPointsWithRegardOfBudget(
+            Pair<ArrayList<ArrayList<Instance>>, ArrayList<Double>> pointsFittingToClusters) {
         // samples have been fitted, so now for every cluster, we are training classifier number of samples,
         // according to budget
         int clusteringIndex = 0;
-        for(ArrayList<Instance> samples: pointsFittingToClusters) {
-            if(clusteringIndex == pointsFittingToClusters.size() - 1 &&
+        for(int i = 0; i < pointsFittingToClusters.getFirst().size(); ++i) {
+            ArrayList<Instance> samples = pointsFittingToClusters.getFirst().get(i);
+            if(clusteringIndex == pointsFittingToClusters.getFirst().size() - 1 &&
                     !checkPointsOutsideOfClusteringsOption.isSet()) {
                 break;
             }
+
             Collections.shuffle(samples);
-            for(int i = 0; i < budgetOption.getValue() * samples.size(); ++i) {
-                classifier.trainOnInstance(samples.get(i));
+
+            for(int j = 0; j < samples.size()
+                    * budgetOption.getValue() * pointsFittingToClusters.getLast().get(i); ++j) {
+                classifier.trainOnInstance(samples.get(j));
             }
             clusteringIndex++;
         }
@@ -138,7 +213,8 @@ public class ALCClassifier extends AbstractClassifier implements MultiClassClass
 
         if(chunk.size() >= chunkSizeOption.getValue()) {
             Clustering clustering = extractClusteringsFromClusterer();
-            ArrayList<ArrayList<Instance>> pointsFittingToClusters = fitPointsToClusterings(clustering);
+            Pair<ArrayList<ArrayList<Instance>>, ArrayList<Double>> pointsFittingToClusters =
+                    fitPointsToClusterings(clustering);
             trainFittedPointsWithRegardOfBudget(pointsFittingToClusters);
             chunk.clear();
         }
